@@ -22,9 +22,9 @@ type
         command*: proc()
 
 var 
-    games*: seq[Game]
     addCommand*:proc(self : Cmd)
 
+#Implementing interface
 proc niceName(self: Game): string = self.niceName
 proc niceName(self: Run): string = self.niceName
 
@@ -37,13 +37,9 @@ proc invoke*(self: Run) =
 
 Game.impl(Cmd)
 Run.impl(Cmd)
+#
 
-proc killAll*() =
-    echo "Kill all"
-    for x in games:
-        putEnv("WINEPREFIX", x.dir)
-        discard execProcess("wineserver -k")
-
+#Constructors
 proc newGame*(niceName: string, name: string, id: int, runner: string, dir: string): Game =
     let game = Game(niceName: niceName, name: name, id: id, runner: runner, dir: dir)
     addCommand(game.toCmd)

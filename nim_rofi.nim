@@ -1,5 +1,6 @@
 import command
 import osproc
+import os
 import strformat
 import strutils
 import json
@@ -7,6 +8,7 @@ import tables
 
 var
     commandTable = initOrderedTable[string, Cmd]()
+    games*: seq[Game]
 let
     gameList = execProcess("lutris -l -j", "./")
     jsonString = "[" & gameList.split('[')[1].split(']')[0] & "]"
@@ -21,10 +23,16 @@ proc getCommandString(list: OrderedTable[string, Cmd]): string =
         line &= list[x].niceName
         result &= line
 
+proc killAll*() =
+    echo "Kill all"
+    for x in games:
+        putEnv("WINEPREFIX", x.dir)
+        discard execProcess("wineserver -k")
+
 proc parseGames() =
     for x in parsed:
         let game = newGame(x["name"].getStr(), x["slug"].getStr(), x["id"].getInt(), x["runner"].getStr(), x["directory"].getStr())
-        command.games.add(game)
+        games.add(game)
 
 proc addCommand*(cmd : Cmd)=
     commandTable[cmd.niceName] = cmd
@@ -36,7 +44,7 @@ proc displayCommands() =
 proc gameCommands() =
     commandTable.clear()
     parseGames()
-    discard newRun("Kill all Lutris Wine", command.killAll)
+    discard newRun("Kill all Lutris Wine", killAll)
     displayCommands()
 
 proc nimShowOff()=
