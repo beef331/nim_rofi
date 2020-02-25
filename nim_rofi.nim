@@ -38,7 +38,7 @@ proc addCommand*(cmd : Cmd)=
     commandTable[cmd.niceName] = cmd
 
 proc displayCommands() =
-    var response: string = execProcess(fmt"echo '{getCommandString(commandTable)}'| rofi -dmenu").replace("\n", "")
+    var response: string = execProcess(fmt"echo '{getCommandString(commandTable)}'| rofi -i -levenshtein-sort -dmenu").replace("\n", "")
     commandTable[response].invoke()
 
 proc gameCommands(a : seq[string]) =
@@ -57,7 +57,6 @@ proc getDocPage(a : seq[string])=
     commandTable.clear()
     var client = newHttpClient()
     var response = parseHtml(client.get(docsUrl & a[0]).bodyStream)
-    #var find = response.child("ul")
     for ul in  response.findAll("ul"):
         if(ul.attr("id") == "toc-list"):
             for linked in ul.findAll("a"):
