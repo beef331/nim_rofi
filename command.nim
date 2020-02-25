@@ -19,7 +19,8 @@ type
         dir*: string
 
     Run* = ref object of BaseCmd
-        command*: proc()
+        command*: proc(args : seq[string])
+        args*: seq[string]
 
 var 
     addCommand*:proc(self : Cmd)
@@ -33,7 +34,7 @@ proc invoke*(self: Game) =
     discard execProcess(fmt"lutris lutris:rungame/{$self.name}")
 
 proc invoke*(self: Run) =
-    self.command()
+    self.command(self.args)
 
 Game.impl(Cmd)
 Run.impl(Cmd)
@@ -45,7 +46,7 @@ proc newGame*(niceName: string, name: string, id: int, runner: string, dir: stri
     addCommand(game.toCmd)
     return game
 
-proc newRun*(niceName: string, command: proc()): Run =
+proc newRun*(niceName: string, command: proc(a : seq[string])): Run =
     let run = Run(niceName: niceName,command : command)
     addCommand(run.toCmd)
     return run
