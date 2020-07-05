@@ -1,4 +1,3 @@
-import command
 import osproc
 import os
 import strformat
@@ -9,12 +8,44 @@ import xmlparser,httpclient,xmltree,browsers,nre,htmlparser
 
 const docsUrl = "https://nim-lang.org/docs/"
 
+type
+    CommandKind = enum
+        ckCommand,
+        ckLutris
+    Command = object
+        niceName: string
+        case kind: CommandKind
+        of ckCommand:
+            command*: proc(args : seq[string])
+            args*: seq[string]
+        of ckLutris:
+            name*: string
+            id*: int
+            runner*: string
+            dir*: string
+
 var
-    commandTable = initOrderedTable[string, Cmd]()
-    games*: seq[Game]
+    commandTable = initOrderedTable[string, Command]()
+    games: seq[Command]
     nimDocProc : proc(a : seq[string])
 
-proc getCommandString(list: OrderedTable[string, Cmd]): string =
+proc initLutris(niceName, name, runner, dir: string, id: int): Command=
+    result = Command(kind: ckLutris, niceName : niceName, name : name, runner: runner, dir : dir, id : id)
+    commandTable.add(niceName,result)
+
+proc initCommand(niceName: string, command : proc(args : seq[string]), args : seq[string] = @[]):Command=
+    result = Command(kind: ckCommand, niceName: niceName, command: command, args: args)
+    commandTable.add(niceName, result)
+
+proc invoke(cmd: Command)=
+    case cmd.kind:
+    of ckCommand: cmd.command(cmd.args)
+    of ckLutris: discard execProcess(fmt"lutris lutris:rungame/{$cmd.name}")
+
+
+
+
+proc getCommandString(list: OrderedTable[string, Command]): string =
     var first: bool = true
     for x in list.keys:
         var line: string
@@ -31,11 +62,11 @@ proc killAll*(a : seq[string]) =
 
 proc parseGames(parsed :JsonNode) =
     for x in parsed:
-        let game = newGame(x["name"].getStr(), x["slug"].getStr(), x["id"].getInt(), x["runner"].getStr(), x["directory"].getStr())
+        let game = initLutris(x["name"].getStr(), x["slug"].getStr(), x["runner"].getStr(), x["directory"].getStr(), x["id"].getInt())
         games.add(game)
 
-proc addCommand*(cmd : Cmd)=
-    commandTable[cmd.niceName] = cmd
+proc addCommand*(Command : Command)=
+    commandTable[Command.niceName] = Command
 
 proc displayCommands() =
     var response: string = execProcess(fmt"echo '{getCommandString(commandTable)}'| rofi -i -levenshtein-sort -dmenu").replace("\n", "")
@@ -47,7 +78,7 @@ proc gameCommands(a : seq[string]) =
     let parsed = parseJson(jsonString)
     commandTable.clear()
     parseGames(parsed)
-    discard newRun("Kill all Lutris Wine", killAll)
+    discard initCommand("Kill all Lutris Wine", killAll)
     displayCommands()
 
 proc openDoc(a : seq[string])=
@@ -60,9 +91,9 @@ proc getDocPage(a : seq[string])=
     for ul in  response.findAll("ul"):
         if(ul.attr("id") == "toc-list"):
             for linked in ul.findAll("a"):
-                var run = newRun(linked.innerText,openDoc)
+                var run = initCommand(linked.innerText,openDoc)
                 run.args.add(a[0] & linked.attr("href"))
-    discard newRun("Back To Modules", nimDocProc)
+    discard initCommand("Back To Modules", nimDocProc)
     displayCommands()
 
 proc nimDocs(a : seq[string])=
@@ -78,17 +109,15 @@ proc nimDocs(a : seq[string])=
         captured = captured.replace("<p />","</p>")
         var xmlParsed = parseXml(captured)
         for a in xmlParsed.findAll("a"):
-            var run = newRun(a.innerText,getDocPage)
+            var run = initCommand(a.innerText,getDocPage)
             run.args.add(a.attr("href"))
 
     displayCommands()
 
 proc baseCommands()=
     commandTable.clear()
-    discard newRun("Game Commands", gameCommands)
-    discard newRun("Nim Documentation",nimDocs)
+    discard initCommand("Game Commands", gameCommands)
+    discard initCommand("Nim Documentation",nimDocs)
     displayCommands()
 
-command.addCommand = addCommand
-nimDocProc = nimDocs
 baseCommands()
