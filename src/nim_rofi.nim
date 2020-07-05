@@ -1,10 +1,16 @@
-import osproc
-import os
-import strformat
-import strutils
-import json
-import tables
-import xmlparser,httpclient,xmltree,browsers,nre,htmlparser
+import 
+    std/[
+        osproc, os,
+        strformat,
+        strutils,
+        json, tables,
+        xmlparser,
+        httpclient,
+        xmltree,
+        browsers,
+        nre,
+        htmlparser
+    ]
 
 const docsUrl = "https://nim-lang.org/docs/"
 
@@ -12,6 +18,7 @@ type
     CommandKind = enum
         ckCommand,
         ckLutris
+
     Command = object
         niceName: string
         case kind: CommandKind
@@ -38,11 +45,13 @@ proc initCommand(niceName: string, command : proc(args : seq[string]), args : se
     commandTable.add(niceName, result)
 
 proc invoke(cmd: Command)=
+    ##Does the logic applied for the object variants
     case cmd.kind:
     of ckCommand: cmd.command(cmd.args)
     of ckLutris: discard execProcess(fmt"lutris lutris:rungame/{$cmd.name}")
 
 proc getCommandString(list: OrderedTable[string, Command]): string =
+    ##Generates the string to be sent to rofi
     var first: bool = true
     for x in list.keys:
         var line: string
@@ -51,7 +60,7 @@ proc getCommandString(list: OrderedTable[string, Command]): string =
         line &= list[x].niceName
         result &= line
 
-proc killAll*(a : seq[string]) =
+proc killAll(a : seq[string]) =
     for x in games:
         putEnv("WINEPREFIX", x.dir)
         discard execProcess("wineserver -k")
@@ -61,10 +70,9 @@ proc parseGames(parsed :JsonNode) =
         let game = initLutris(x["name"].getStr(), x["slug"].getStr(), x["runner"].getStr(), x["directory"].getStr(), x["id"].getInt())
         games.add(game)
 
-proc addCommand*(Command : Command)=
-    commandTable[Command.niceName] = Command
-
 proc displayCommands(title, mesg: string = "") =
+    ##Takes in title, mesg which are strings for what to promt the user with
+    ##Title is displayed on the input line, message as a sub title
     var command = "rofi -i -levenshtein-sort -dmenu"
 
     if(not title.isEmptyOrWhitespace()):
@@ -78,13 +86,13 @@ proc displayCommands(title, mesg: string = "") =
     if(commandTable.contains(response)):
         commandTable[response].invoke()
 
-
 proc openDoc(a : seq[string])
 proc getDocPage(a : seq[string])
 proc nimDocs(a : seq[string])
 proc baseCommands()
 
 proc gameCommands(a : seq[string]) =
+    ##Parses the lutris JSON data and puts it in a command version
     let gameList = execProcess("lutris -l -j", "./")
     let jsonString = "[" & gameList.split('[')[1].split(']')[0] & "]"
     let parsed = parseJson(jsonString)
@@ -94,12 +102,13 @@ proc gameCommands(a : seq[string]) =
     discard initCommand("Back To Main", proc(a:seq[string]) = baseCommands())
     displayCommands("Lutris Games")
 
-
-
 proc openDoc(a : seq[string])=
+    ##Does what it says on the tin, opens the browser to the document
     openDefaultBrowser(docsUrl & a[0])
 
 proc getDocPage(a : seq[string])=
+    ##Gets the symbols from the doc page, 
+    ##all the HTML <a> on the left of the moduel
     commandTable.clear()
     var client = newHttpClient()
     var response = parseHtml(client.get(docsUrl & a[0]).bodyStream)
@@ -112,6 +121,7 @@ proc getDocPage(a : seq[string])=
     displayCommands(a[0].split(".")[0])
 
 proc nimDocs(a : seq[string])=
+    ##Function that gets and parsed the nim modules, and then setups the URL
     commandTable.clear()
     var client = newHttpClient()
     var response = (client.get(fmt"{docsUrl}theindex.html").body())
@@ -129,6 +139,7 @@ proc nimDocs(a : seq[string])=
     displayCommands("Nim Docs")
 
 proc baseCommands()=
+    ##Main function that starts the UI experience
     commandTable.clear()
     discard initCommand("Game Commands", gameCommands)
     discard initCommand("Nim Documentation",nimDocs)
