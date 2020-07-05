@@ -27,7 +27,7 @@ type
 var
     commandTable = initOrderedTable[string, Command]()
     games: seq[Command]
-    nimDocProc : proc(a : seq[string])
+
 
 proc initLutris(niceName, name, runner, dir: string, id: int): Command=
     result = Command(kind: ckLutris, niceName : niceName, name : name, runner: runner, dir : dir, id : id)
@@ -42,9 +42,6 @@ proc invoke(cmd: Command)=
     of ckCommand: cmd.command(cmd.args)
     of ckLutris: discard execProcess(fmt"lutris lutris:rungame/{$cmd.name}")
 
-
-
-
 proc getCommandString(list: OrderedTable[string, Command]): string =
     var first: bool = true
     for x in list.keys:
@@ -55,7 +52,6 @@ proc getCommandString(list: OrderedTable[string, Command]): string =
         result &= line
 
 proc killAll*(a : seq[string]) =
-    echo "Kill all"
     for x in games:
         putEnv("WINEPREFIX", x.dir)
         discard execProcess("wineserver -k")
@@ -68,9 +64,25 @@ proc parseGames(parsed :JsonNode) =
 proc addCommand*(Command : Command)=
     commandTable[Command.niceName] = Command
 
-proc displayCommands() =
-    var response: string = execProcess(fmt"echo '{getCommandString(commandTable)}'| rofi -i -levenshtein-sort -dmenu").replace("\n", "")
-    commandTable[response].invoke()
+proc displayCommands(title, mesg: string = "") =
+    var command = "rofi -i -levenshtein-sort -dmenu"
+
+    if(not title.isEmptyOrWhitespace()):
+        command = &"{command} -p \"{title}\""
+    if(not mesg.isEmptyOrWhitespace()):
+        command = &"{command} -mesg \"{mesg}\""
+    
+    echo command
+
+    var response: string = execProcess(fmt"echo '{getCommandString(commandTable)}'| {command}").replace("\n", "")
+    if(commandTable.contains(response)):
+        commandTable[response].invoke()
+
+
+proc openDoc(a : seq[string])
+proc getDocPage(a : seq[string])
+proc nimDocs(a : seq[string])
+proc baseCommands()
 
 proc gameCommands(a : seq[string]) =
     let gameList = execProcess("lutris -l -j", "./")
@@ -79,7 +91,10 @@ proc gameCommands(a : seq[string]) =
     commandTable.clear()
     parseGames(parsed)
     discard initCommand("Kill all Lutris Wine", killAll)
-    displayCommands()
+    discard initCommand("Back To Main", proc(a:seq[string]) = baseCommands())
+    displayCommands("Lutris Games")
+
+
 
 proc openDoc(a : seq[string])=
     openDefaultBrowser(docsUrl & a[0])
@@ -91,10 +106,10 @@ proc getDocPage(a : seq[string])=
     for ul in  response.findAll("ul"):
         if(ul.attr("id") == "toc-list"):
             for linked in ul.findAll("a"):
-                var run = initCommand(linked.innerText,openDoc)
-                run.args.add(a[0] & linked.attr("href"))
-    discard initCommand("Back To Modules", nimDocProc)
-    displayCommands()
+                discard initCommand(linked.innerText, openDoc, @[a[0] & linked.attr("href")])
+    discard initCommand("Back To Modules", nimDocs)
+    discard initCommand("Back To Main", proc(a:seq[string]) = baseCommands())
+    displayCommands(a[0].split(".")[0])
 
 proc nimDocs(a : seq[string])=
     commandTable.clear()
@@ -109,15 +124,14 @@ proc nimDocs(a : seq[string])=
         captured = captured.replace("<p />","</p>")
         var xmlParsed = parseXml(captured)
         for a in xmlParsed.findAll("a"):
-            var run = initCommand(a.innerText,getDocPage)
-            run.args.add(a.attr("href"))
-
-    displayCommands()
+            discard initCommand(a.innerText,getDocPage, @[a.attr("href")])
+    discard initCommand("Back To Main", proc(a:seq[string]) = baseCommands())
+    displayCommands("Nim Docs")
 
 proc baseCommands()=
     commandTable.clear()
     discard initCommand("Game Commands", gameCommands)
     discard initCommand("Nim Documentation",nimDocs)
-    displayCommands()
+    displayCommands("Nim Rofi")
 
 baseCommands()
