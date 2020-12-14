@@ -10,4 +10,4 @@ bin           = @["nim_rofi"]
 
 
 # Dependencies
-requires "nim >= 1.2.0"
+requires "nim >= 1.5.0"
