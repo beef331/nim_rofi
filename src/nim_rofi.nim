@@ -146,7 +146,7 @@ proc nimDocs(a: seq[string]) =
     displayCommands("Nim Docs")
 
 proc launchCode(a: seq[string]) =
-    discard execProcess("code", args = a, options = {poStdErrToStdOut, poUsePath})
+    discard execProcess("code " & a[0])
 
 
 proc openCode(a: seq[string]) =
